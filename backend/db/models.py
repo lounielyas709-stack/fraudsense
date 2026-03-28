@@ -2,8 +2,12 @@ from sqlalchemy import create_engine, Column, Integer, Float, String, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
+import os
+from dotenv import load_dotenv
 
-DATABASE_URL = "postgresql://postgres:MessiElyas2007@localhost:5432/fraudsense"
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:TONMOTDEPASSE@localhost:5432/fraudsense")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
@@ -11,7 +15,6 @@ Base = declarative_base()
 
 class Transaction(Base):
     __tablename__ = "transactions"
-
     id = Column(Integer, primary_key=True, index=True)
     amount = Column(Float)
     v1 = Column(Float); v2 = Column(Float); v3 = Column(Float)
@@ -28,7 +31,6 @@ class Transaction(Base):
 
 class Prediction(Base):
     __tablename__ = "predictions"
-
     id = Column(Integer, primary_key=True, index=True)
     transaction_id = Column(Integer)
     fraud_probability = Column(Float)
