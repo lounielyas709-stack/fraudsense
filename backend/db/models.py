@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:TONMOTDEPASSE@localhost:5432/fraudsense")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:MessiElyas2007@localhost:5432/fraudsense")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)

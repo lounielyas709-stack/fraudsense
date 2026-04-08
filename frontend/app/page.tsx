@@ -5,7 +5,7 @@ import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 import { AlertTriangle, ShieldCheck, Activity, TrendingUp, Upload, Zap, ChevronRight } from 'lucide-react';
 
-const API = 'http://localhost:8000';
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 interface Fraud {
   transaction_id: number;

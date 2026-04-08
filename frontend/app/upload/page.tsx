@@ -5,7 +5,7 @@ import axios from 'axios';
 import { Upload, ArrowLeft, CheckCircle, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 
-const API = 'http://localhost:8000';
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export default function UploadPage() {
   const [dragging, setDragging] = useState(false);

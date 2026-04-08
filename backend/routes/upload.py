@@ -1,7 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from backend.db.models import DATABASE_URL
+from backend.ml.loader import model, scaler
 import pandas as pd
-import joblib
 import numpy as np
 import io
 import psycopg2
@@ -9,10 +9,9 @@ from urllib.parse import urlparse
 
 router = APIRouter()
 
-model = joblib.load("backend/ml/model.pkl")
-scaler = joblib.load("backend/ml/scaler.pkl")
-
 TOP_FEATURES = ["V17", "V14", "V12", "V10", "V16", "V3", "V7", "V11"]
+REQUIRED_COLS = [f"V{i}" for i in range(1, 29)] + ["Amount"]
+
 
 def parse_db_url(url):
     p = urlparse(url)
@@ -24,7 +23,8 @@ def parse_db_url(url):
         "password": p.password,
     }
 
-def get_risk_factors(row, fraud_prob):
+
+def get_risk_factors(row) -> list[str]:
     factors = []
     for feat in TOP_FEATURES:
         col = feat.lower()
@@ -37,54 +37,81 @@ def get_risk_factors(row, fraud_prob):
         factors.append("Pattern inhabituel détecté")
     return factors[:3]
 
+
 @router.post("/upload")
 async def upload_csv(file: UploadFile = File(...)):
     contents = await file.read()
-    df = pd.read_csv(io.BytesIO(contents))
 
-    # Scaling + lowercase
+    try:
+        df = pd.read_csv(io.BytesIO(contents))
+    except Exception:
+        raise HTTPException(status_code=422, detail="Impossible de lire le fichier CSV")
+
+    missing = [c for c in REQUIRED_COLS if c not in df.columns]
+    if missing:
+        raise HTTPException(status_code=422, detail=f"Colonnes manquantes : {', '.join(missing)}")
+
+    if df.empty:
+        raise HTTPException(status_code=422, detail="Le fichier CSV est vide")
+
+    # Scale Amount before lowercasing columns
     df["amount_scaled"] = scaler.transform(df[["Amount"]])
     df.columns = [c.lower() for c in df.columns]
 
-    # ML en une seule fois
-    X = df[[f"v{i}" for i in range(1, 29)] + ["amount_scaled"]].values
+    v_cols = [f"v{i}" for i in range(1, 29)]
+    X = df[v_cols + ["amount_scaled"]].values
     probs = model.predict_proba(X)[:, 1]
 
-    # Connexion psycopg2 directe
     db_params = parse_db_url(DATABASE_URL)
-    conn = psycopg2.connect(**db_params)
-    cur = conn.cursor()
-
     try:
-        # --- COPY transactions ---
+        conn = psycopg2.connect(**db_params)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Impossible de se connecter à la base de données")
+
+    cur = conn.cursor()
+    try:
+        # Insert transactions via COPY
         tx_buf = io.StringIO()
-        v_cols = [f"v{i}" for i in range(1, 29)]
         for _, row in df.iterrows():
             vals = [str(float(row["amount"]))] + [str(float(row[c])) for c in v_cols]
             tx_buf.write("\t".join(vals) + "\n")
         tx_buf.seek(0)
 
-        cur.execute("CREATE TEMP TABLE tmp_tx (LIKE transactions INCLUDING ALL) ON COMMIT DROP")
+        cur.execute(
+            "CREATE TEMP TABLE tmp_tx (LIKE transactions INCLUDING DEFAULTS) ON COMMIT DROP"
+        )
         cur.copy_from(tx_buf, "tmp_tx", columns=["amount"] + v_cols)
-        cur.execute("INSERT INTO transactions (amount, v1,v2,v3,v4,v5,v6,v7,v8,v9,v10,v11,v12,v13,v14,v15,v16,v17,v18,v19,v20,v21,v22,v23,v24,v25,v26,v27,v28) SELECT amount,v1,v2,v3,v4,v5,v6,v7,v8,v9,v10,v11,v12,v13,v14,v15,v16,v17,v18,v19,v20,v21,v22,v23,v24,v25,v26,v27,v28 FROM tmp_tx RETURNING id")
+        cur.execute(
+            "INSERT INTO transactions (amount,v1,v2,v3,v4,v5,v6,v7,v8,v9,v10,v11,v12,"
+            "v13,v14,v15,v16,v17,v18,v19,v20,v21,v22,v23,v24,v25,v26,v27,v28) "
+            "SELECT amount,v1,v2,v3,v4,v5,v6,v7,v8,v9,v10,v11,v12,"
+            "v13,v14,v15,v16,v17,v18,v19,v20,v21,v22,v23,v24,v25,v26,v27,v28 "
+            "FROM tmp_tx RETURNING id"
+        )
         tx_ids = [row[0] for row in cur.fetchall()]
 
-        # --- COPY predictions ---
+        # Insert predictions via COPY
         pred_buf = io.StringIO()
         for tx_id, (_, row), prob in zip(tx_ids, df.iterrows(), probs):
             fraud_prob = float(prob)
             label = "fraude" if fraud_prob > 0.5 else "normal"
-            if fraud_prob > 0.8: risk_level = "critique"
-            elif fraud_prob > 0.5: risk_level = "élevé"
-            elif fraud_prob > 0.3: risk_level = "moyen"
-            else: risk_level = "faible"
-            factors = get_risk_factors(row, fraud_prob) if label == "fraude" else []
+            if fraud_prob > 0.8:
+                risk_level = "critique"
+            elif fraud_prob > 0.5:
+                risk_level = "élevé"
+            elif fraud_prob > 0.3:
+                risk_level = "moyen"
+            else:
+                risk_level = "faible"
+            factors = get_risk_factors(row) if label == "fraude" else []
             risk_factors = ", ".join(factors)
             pred_buf.write(f"{tx_id}\t{round(fraud_prob, 4)}\t{label}\t{risk_level}\t{risk_factors}\n")
 
         pred_buf.seek(0)
-        cur.copy_from(pred_buf, "predictions",
-                      columns=["transaction_id", "fraud_probability", "label", "risk_level", "risk_factors"])
+        cur.copy_from(
+            pred_buf, "predictions",
+            columns=["transaction_id", "fraud_probability", "label", "risk_level", "risk_factors"],
+        )
 
         conn.commit()
 
@@ -97,5 +124,5 @@ async def upload_csv(file: UploadFile = File(...)):
 
     return {
         "message": f"{len(df)} transactions importées et analysées",
-        "total": len(df)
+        "total": len(df),
     }
