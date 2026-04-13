@@ -11,8 +11,24 @@ export default function UploadPage() {
   const [dragging, setDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [result, setResult] = useState<{ message: string; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const handleClearData = async () => {
+    if (!confirm('Vider toute la base de données ? Cette action est irréversible.')) return;
+    setClearing(true);
+    setError(null);
+    setResult(null);
+    try {
+      await axios.delete(`${API}/data`, { timeout: 15000 });
+      setResult({ message: 'Base de données vidée avec succès.', total: 0 });
+    } catch {
+      setError('Erreur lors de la suppression des données.');
+    } finally {
+      setClearing(false);
+    }
+  };
 
   const handleFile = (f: File) => {
     if (!f.name.endsWith('.csv')) {
@@ -157,9 +173,27 @@ export default function UploadPage() {
           borderRadius: 8, fontSize: 14, fontWeight: 600,
           transition: 'all 0.2s',
           cursor: file && !loading ? 'pointer' : 'not-allowed',
+          marginBottom: 12,
         }}
       >
         {loading ? 'Analyse en cours...' : 'Lancer l\'analyse'}
+      </button>
+
+      {/* Clear DB */}
+      <button
+        onClick={handleClearData}
+        disabled={clearing || loading}
+        style={{
+          width: '100%', padding: '12px',
+          background: 'transparent',
+          color: clearing ? 'var(--text-muted)' : '#f87171',
+          border: '1px solid #f8717130',
+          borderRadius: 8, fontSize: 13, fontWeight: 500,
+          cursor: clearing || loading ? 'not-allowed' : 'pointer',
+          opacity: clearing ? 0.6 : 1,
+        }}
+      >
+        {clearing ? 'Suppression...' : 'Vider la base de données'}
       </button>
 
     </div>

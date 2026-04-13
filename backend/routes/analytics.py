@@ -44,6 +44,25 @@ def get_all_frauds(
         db.close()
 
 
+@router.delete("/data")
+def clear_all_data():
+    db = SessionLocal()
+    try:
+        deleted_predictions = db.query(Prediction).delete()
+        deleted_transactions = db.query(Transaction).delete()
+        db.commit()
+        return {
+            "message": "Base de données vidée avec succès",
+            "deleted_transactions": deleted_transactions,
+            "deleted_predictions": deleted_predictions,
+        }
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Erreur lors de la suppression")
+    finally:
+        db.close()
+
+
 @router.get("/analytics")
 def get_analytics():
     db = SessionLocal()
