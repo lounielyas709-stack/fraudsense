@@ -48,17 +48,17 @@ def get_all_frauds(
 def clear_all_data():
     db = SessionLocal()
     try:
-        deleted_predictions = db.query(Prediction).delete()
-        deleted_transactions = db.query(Transaction).delete()
+        deleted_predictions = db.query(Prediction).delete(synchronize_session=False)
+        deleted_transactions = db.query(Transaction).delete(synchronize_session=False)
         db.commit()
         return {
             "message": "Base de données vidée avec succès",
             "deleted_transactions": deleted_transactions,
             "deleted_predictions": deleted_predictions,
         }
-    except Exception:
+    except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail="Erreur lors de la suppression")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la suppression : {e}")
     finally:
         db.close()
 
