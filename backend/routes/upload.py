@@ -2,10 +2,9 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from backend.db.models import DATABASE_URL
 from backend.ml.loader import model, scaler
 import pandas as pd
-import numpy as np
 import io
 import psycopg2
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 router = APIRouter()
 
@@ -13,15 +12,26 @@ TOP_FEATURES = ["V17", "V14", "V12", "V10", "V16", "V3", "V7", "V11"]
 REQUIRED_COLS = [f"V{i}" for i in range(1, 29)] + ["Amount"]
 
 
-def parse_db_url(url):
+def parse_db_url(url: str) -> dict:
+    # Normalise le préfixe (Render donne postgres://)
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://"):]
     p = urlparse(url)
-    return {
+    params: dict = {
         "host": p.hostname,
         "port": p.port or 5432,
         "dbname": p.path.lstrip("/"),
         "user": p.username,
         "password": p.password,
     }
+    # Récupère sslmode depuis la query string si présent
+    qs = parse_qs(p.query)
+    if "sslmode" in qs:
+        params["sslmode"] = qs["sslmode"][0]
+    elif p.hostname and p.hostname not in ("localhost", "127.0.0.1"):
+        # Render et la plupart des hébergeurs cloud exigent SSL
+        params["sslmode"] = "require"
+    return params
 
 
 def get_risk_factors(row) -> list[str]:
@@ -54,7 +64,7 @@ async def upload_csv(file: UploadFile = File(...)):
     if df.empty:
         raise HTTPException(status_code=422, detail="Le fichier CSV est vide")
 
-    # Scale Amount before lowercasing columns
+    # Scale Amount avant de passer en minuscules
     df["amount_scaled"] = scaler.transform(df[["Amount"]])
     df.columns = [c.lower() for c in df.columns]
 
@@ -65,7 +75,7 @@ async def upload_csv(file: UploadFile = File(...)):
     db_params = parse_db_url(DATABASE_URL)
     try:
         conn = psycopg2.connect(**db_params)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Impossible de se connecter à la base de données")
 
     cur = conn.cursor()

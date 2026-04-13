@@ -1,3 +1,33 @@
-"*.pdf" 
-"*.pdf" 
-"*.pdf" 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Env
+.env
+.env.*
+
+# Data
+data/creditcard.csv
+data/test_sample.csv
+
+# Node
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Misc
+.DS_Store
+*.pem
+*.db
+*.pdf
+.vercel
+.claude/settings.local.json

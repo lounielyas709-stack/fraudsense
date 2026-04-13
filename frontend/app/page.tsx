@@ -130,18 +130,26 @@ function FraudModal({ fraud, onClose }: { fraud: Fraud; onClose: () => void }) {
 export default function Dashboard() {
   const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Fraud | null>(null);
 
   useEffect(() => {
-    axios.get(`${API}/analytics`).then(res => {
-      setData(res.data);
-      setLoading(false);
-    });
+    axios.get(`${API}/analytics`)
+      .then(res => { setData(res.data); })
+      .catch(() => { setError("Impossible de contacter l'API — vérifiez que le backend est démarré."); })
+      .finally(() => { setLoading(false); });
   }, []);
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-secondary)' }}>
       Chargement des données...
+    </div>
+  );
+
+  if (error) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', flexDirection: 'column', gap: 12 }}>
+      <span style={{ color: '#f87171', fontSize: 15, fontWeight: 600 }}>Erreur de connexion</span>
+      <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{error}</span>
     </div>
   );
 

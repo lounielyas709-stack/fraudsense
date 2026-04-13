@@ -2,10 +2,10 @@ services:
   - type: web
     name: fraudsense-api
     runtime: python
-    buildCommand: pip install -r backend/requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DATABASE_URL
-        sync: false  # À renseigner dans le dashboard Render → Environment
+        sync: false  # Render Dashboard → Environment → coller l'Internal Database URL
       - key: ALLOWED_ORIGINS
-        value: https://TON_FRONTEND.vercel.app  # Remplace par l'URL de ton frontend Vercel
+        sync: false  # Render Dashboard → Environment → URL Vercel (ex: https://fraudsense.vercel.app)

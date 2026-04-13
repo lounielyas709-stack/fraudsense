@@ -1,17 +1,22 @@
 from sqlalchemy import create_engine, Column, Integer, Float, String, DateTime
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:MessiElyas2007@localhost:5432/fraudsense")
+_raw_url = os.getenv("DATABASE_URL")
+if not _raw_url:
+    raise RuntimeError("DATABASE_URL n'est pas défini. Ajoutez-le dans les variables d'environnement.")
+
+# Render fournit des URLs postgres:// ; SQLAlchemy exige postgresql://
+DATABASE_URL = _raw_url.replace("postgres://", "postgresql://", 1)
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
+
 
 class Transaction(Base):
     __tablename__ = "transactions"
@@ -29,6 +34,7 @@ class Transaction(Base):
     v28 = Column(Float)
     imported_at = Column(DateTime, default=datetime.utcnow)
 
+
 class Prediction(Base):
     __tablename__ = "predictions"
     id = Column(Integer, primary_key=True, index=True)
@@ -38,6 +44,7 @@ class Prediction(Base):
     risk_level = Column(String)
     risk_factors = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
+
 
 def init_db():
     Base.metadata.create_all(bind=engine)
