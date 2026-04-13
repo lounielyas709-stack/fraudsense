@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
-import { AlertTriangle, ShieldCheck, Activity, TrendingUp, Upload, Zap, ChevronRight } from 'lucide-react';
+import { AlertTriangle, ShieldCheck, Activity, TrendingUp, Upload, Zap, ChevronRight, List } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -181,6 +181,15 @@ export default function Dashboard() {
             </p>
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
+            <a href="/frauds" style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: 'var(--bg-card)', color: 'var(--text-primary)',
+              border: '1px solid var(--border)',
+              padding: '10px 20px', borderRadius: 8,
+              fontSize: 13, fontWeight: 600,
+            }}>
+              <List size={14} /> Toutes les fraudes
+            </a>
             <a href="/simulate" style={{
               display: 'flex', alignItems: 'center', gap: 8,
               background: 'var(--bg-card)', color: 'var(--text-primary)',
