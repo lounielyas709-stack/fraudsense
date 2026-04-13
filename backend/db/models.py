@@ -1,6 +1,9 @@
 from sqlalchemy import create_engine, Column, Integer, Float, String, DateTime
 from sqlalchemy.orm import declarative_base, sessionmaker
-from datetime import datetime
+from datetime import datetime, timezone
+
+def _utcnow():
+    return datetime.now(timezone.utc)
 import os
 from dotenv import load_dotenv
 
@@ -13,7 +16,7 @@ if not _raw_url:
 # Render fournit des URLs postgres:// ; SQLAlchemy exige postgresql://
 DATABASE_URL = _raw_url.replace("postgres://", "postgresql://", 1)
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, connect_args={"connect_timeout": 10})
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
 
@@ -32,7 +35,7 @@ class Transaction(Base):
     v22 = Column(Float); v23 = Column(Float); v24 = Column(Float)
     v25 = Column(Float); v26 = Column(Float); v27 = Column(Float)
     v28 = Column(Float)
-    imported_at = Column(DateTime, default=datetime.utcnow)
+    imported_at = Column(DateTime, default=_utcnow)
 
 
 class Prediction(Base):
@@ -43,7 +46,7 @@ class Prediction(Base):
     label = Column(String)
     risk_level = Column(String)
     risk_factors = Column(String)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
 
 
 def init_db():

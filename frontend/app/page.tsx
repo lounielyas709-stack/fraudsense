@@ -134,7 +134,7 @@ export default function Dashboard() {
   const [selected, setSelected] = useState<Fraud | null>(null);
 
   useEffect(() => {
-    axios.get(`${API}/analytics`)
+    axios.get(`${API}/analytics`, { timeout: 15000 })
       .then(res => { setData(res.data); })
       .catch(() => { setError("Impossible de contacter l'API — vérifiez que le backend est démarré."); })
       .finally(() => { setLoading(false); });

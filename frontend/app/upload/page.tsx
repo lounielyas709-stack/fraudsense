@@ -38,7 +38,7 @@ export default function UploadPage() {
     try {
       const form = new FormData();
       form.append('file', file);
-      const res = await axios.post(`${API}/upload`, form);
+      const res = await axios.post(`${API}/upload`, form, { timeout: 60000 });
       setResult(res.data);
       setFile(null);
     } catch {

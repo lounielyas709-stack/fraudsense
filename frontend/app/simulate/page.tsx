@@ -48,7 +48,7 @@ export default function SimulatePage() {
   const handleSimulate = async () => {
     setLoading(true);
     try {
-      const res = await axios.post(`${API}/simulate`, tx);
+      const res = await axios.post(`${API}/simulate`, tx, { timeout: 15000 });
       setResult(res.data);
     } finally {
       setLoading(false);
