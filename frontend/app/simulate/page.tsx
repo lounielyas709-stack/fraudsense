@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { ArrowLeft, Play, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
@@ -44,11 +44,23 @@ export default function SimulatePage() {
   const [tx, setTx] = useState(DEFAULT_TX);
   const [result, setResult] = useState<SimResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [threshold, setThreshold] = useState(0.5);
+
+  // Persist threshold in localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem('fraudsense_threshold');
+    if (stored) setThreshold(parseFloat(stored));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('fraudsense_threshold', threshold.toString());
+    setResult(null); // reset result when threshold changes
+  }, [threshold]);
 
   const handleSimulate = async () => {
     setLoading(true);
     try {
-      const res = await axios.post(`${API}/simulate`, tx, { timeout: 15000 });
+      const res = await axios.post(`${API}/simulate?threshold=${threshold}`, tx, { timeout: 15000 });
       setResult(res.data);
     } finally {
       setLoading(false);
@@ -144,6 +156,29 @@ export default function SimulatePage() {
             ))}
           </div>
 
+          {/* Threshold slider */}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: 20, marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Seuil de détection</span>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                  Au-dessus → classé fraude
+                </div>
+              </div>
+              <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--cyan)' }}>
+                {Math.round(threshold * 100)}%
+              </span>
+            </div>
+            <input type="range" min="0.1" max="0.9" step="0.05"
+              value={threshold}
+              onChange={e => setThreshold(parseFloat(e.target.value))}
+              style={{ width: '100%', accentColor: 'var(--cyan)' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+              <span>10% (sensible)</span><span>90% (strict)</span>
+            </div>
+          </div>
+
           {/* Simulate button */}
           <button onClick={handleSimulate} disabled={loading} style={{
             width: '100%', padding: '14px',
@@ -185,8 +220,17 @@ export default function SimulatePage() {
                 <div style={{ fontSize: 56, fontWeight: 700, color, letterSpacing: '-0.03em', lineHeight: 1 }}>
                   {(result.fraud_probability * 100).toFixed(1)}%
                 </div>
-                <div style={{ marginTop: 16, height: 8, background: 'var(--border)', borderRadius: 4 }}>
+                {/* Threshold marker on bar */}
+                <div style={{ marginTop: 16, position: 'relative', height: 8, background: 'var(--border)', borderRadius: 4 }}>
                   <div style={{ height: '100%', width: `${result.fraud_probability * 100}%`, background: color, borderRadius: 4, transition: 'width 0.5s ease' }} />
+                  <div style={{
+                    position: 'absolute', top: -4, left: `${threshold * 100}%`,
+                    width: 2, height: 16, background: 'var(--text-muted)',
+                    transform: 'translateX(-50%)',
+                  }} />
+                </div>
+                <div style={{ marginTop: 4, fontSize: 10, color: 'var(--text-muted)', textAlign: 'left', paddingLeft: `${threshold * 100}%` }}>
+                  seuil {Math.round(threshold * 100)}%
                 </div>
                 <div style={{ marginTop: 12 }}>
                   <span style={{
@@ -199,17 +243,21 @@ export default function SimulatePage() {
                 </div>
               </div>
 
-              {/* Factors */}
+              {/* SHAP Factors */}
               {result.risk_factors.length > 0 && (
                 <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 20 }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>
-                    Facteurs détectés
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>
+                    Analyse SHAP
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>
+                    Contributions des features à la décision
                   </div>
                   {result.risk_factors.map((f, i) => (
                     <div key={i} style={{
                       background: 'var(--bg)', borderLeft: '3px solid #f87171',
                       borderRadius: 6, padding: '10px 14px',
-                      fontSize: 13, marginBottom: 8, color: 'var(--text-primary)'
+                      fontSize: 13, marginBottom: 8, color: 'var(--text-primary)',
+                      fontFamily: 'monospace',
                     }}>
                       {f}
                     </div>

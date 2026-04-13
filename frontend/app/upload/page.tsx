@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Upload, ArrowLeft, CheckCircle, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
@@ -14,6 +14,17 @@ export default function UploadPage() {
   const [clearing, setClearing] = useState(false);
   const [result, setResult] = useState<{ message: string; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [threshold, setThreshold] = useState(0.5);
+
+  // Sync threshold with localStorage (shared with simulate page)
+  useEffect(() => {
+    const stored = localStorage.getItem('fraudsense_threshold');
+    if (stored) setThreshold(parseFloat(stored));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('fraudsense_threshold', threshold.toString());
+  }, [threshold]);
 
   const handleClearData = async () => {
     if (!confirm('Vider toute la base de données ? Cette action est irréversible.')) return;
@@ -54,7 +65,7 @@ export default function UploadPage() {
     try {
       const form = new FormData();
       form.append('file', file);
-      const res = await axios.post(`${API}/upload`, form, { timeout: 60000 });
+      const res = await axios.post(`${API}/upload?threshold=${threshold}`, form, { timeout: 60000 });
       setResult(res.data);
       setFile(null);
     } catch {
@@ -113,6 +124,29 @@ export default function UploadPage() {
           <span style={{ color: '#f87171', fontSize: 13 }}>{error}</span>
         </div>
       )}
+
+      {/* Threshold */}
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: '16px 20px', marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Seuil de détection</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              Transactions au-dessus de ce score seront classées comme fraude
+            </div>
+          </div>
+          <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--cyan)' }}>
+            {Math.round(threshold * 100)}%
+          </span>
+        </div>
+        <input type="range" min="0.1" max="0.9" step="0.05"
+          value={threshold}
+          onChange={e => setThreshold(parseFloat(e.target.value))}
+          style={{ width: '100%', accentColor: 'var(--cyan)' }}
+        />
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+          <span>10% (sensible)</span><span>90% (strict)</span>
+        </div>
+      </div>
 
       {/* Drop Zone */}
       <div

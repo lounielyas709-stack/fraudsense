@@ -1,6 +1,6 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query
 from backend.db.models import DATABASE_URL
-from backend.ml.loader import model, scaler
+from backend.ml.loader import model, scaler, compute_shap, shap_top_factors
 import pandas as pd
 import io
 import psycopg2
@@ -8,7 +8,6 @@ from urllib.parse import urlparse, parse_qs
 
 router = APIRouter()
 
-TOP_FEATURES = ["V17", "V14", "V12", "V10", "V16", "V3", "V7", "V11"]
 REQUIRED_COLS = [f"V{i}" for i in range(1, 29)] + ["Amount"]
 
 
@@ -34,22 +33,11 @@ def parse_db_url(url: str) -> dict:
     return params
 
 
-def get_risk_factors(row) -> list[str]:
-    factors = []
-    for feat in TOP_FEATURES:
-        col = feat.lower()
-        val = row[col]
-        if abs(val) > 2:
-            factors.append(f"{feat} anormal ({val:.2f})")
-    if row["amount_scaled"] > 2:
-        factors.append("Montant élevé")
-    if not factors:
-        factors.append("Pattern inhabituel détecté")
-    return factors[:3]
-
-
 @router.post("/upload")
-async def upload_csv(file: UploadFile = File(...)):
+async def upload_csv(
+    file: UploadFile = File(...),
+    threshold: float = Query(0.5, ge=0.1, le=0.9),
+):
     contents = await file.read()
 
     try:
@@ -71,6 +59,9 @@ async def upload_csv(file: UploadFile = File(...)):
     v_cols = [f"v{i}" for i in range(1, 29)]
     X = df[v_cols + ["amount_scaled"]].values
     probs = model.predict_proba(X)[:, 1]
+
+    # Compute SHAP for all rows at once (vectorised — same cost as predicting)
+    all_fraud_sv = compute_shap(X)  # shape (n_rows, n_features)
 
     db_params = parse_db_url(DATABASE_URL)
     try:
@@ -102,9 +93,9 @@ async def upload_csv(file: UploadFile = File(...)):
 
         # Insert predictions via COPY
         pred_buf = io.StringIO()
-        for tx_id, (_, row), prob in zip(tx_ids, df.iterrows(), probs):
+        for i, (tx_id, (_, row), prob) in enumerate(zip(tx_ids, df.iterrows(), probs)):
             fraud_prob = float(prob)
-            label = "fraude" if fraud_prob > 0.5 else "normal"
+            label = "fraude" if fraud_prob > threshold else "normal"
             if fraud_prob > 0.8:
                 risk_level = "critique"
             elif fraud_prob > 0.5:
@@ -113,7 +104,12 @@ async def upload_csv(file: UploadFile = File(...)):
                 risk_level = "moyen"
             else:
                 risk_level = "faible"
-            factors = get_risk_factors(row) if label == "fraude" else []
+
+            if label == "fraude":
+                factors = shap_top_factors(all_fraud_sv[i])
+            else:
+                factors = []
+
             risk_factors = ", ".join(factors)
             pred_buf.write(f"{tx_id}\t{round(fraud_prob, 4)}\t{label}\t{risk_level}\t{risk_factors}\n")
 

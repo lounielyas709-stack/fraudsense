@@ -1,27 +1,14 @@
-from fastapi import APIRouter, HTTPException
-from backend.ml.loader import model, scaler
+from fastapi import APIRouter, HTTPException, Query
+from backend.ml.loader import model, scaler, compute_shap, shap_top_factors
 import pandas as pd
 
 router = APIRouter()
 
 FEATURE_COLS = [f"V{i}" for i in range(1, 29)] + ["Amount"]
-TOP_FEATURES = ["V17", "V14", "V12", "V10", "V16", "V3", "V7", "V11"]
-
-
-def get_risk_factors(row: pd.Series) -> list[str]:
-    factors = []
-    for feat in TOP_FEATURES:
-        if abs(row[feat]) > 2:
-            factors.append(f"{feat} anormal ({row[feat]:.2f})")
-    if row["Amount"] > 2:
-        factors.append("Montant élevé")
-    if not factors:
-        factors.append("Pattern inhabituel détecté")
-    return factors[:3]
 
 
 @router.post("/predict")
-def predict(transaction: dict):
+def predict(transaction: dict, threshold: float = Query(0.5, ge=0.1, le=0.9)):
     missing = [c for c in FEATURE_COLS if c not in transaction]
     if missing:
         raise HTTPException(status_code=422, detail=f"Champs manquants : {', '.join(missing)}")
@@ -31,7 +18,7 @@ def predict(transaction: dict):
     X = df[FEATURE_COLS]
 
     fraud_prob = float(model.predict_proba(X)[0][1])
-    label = "fraude" if fraud_prob > 0.5 else "normal"
+    label = "fraude" if fraud_prob > threshold else "normal"
 
     if fraud_prob > 0.8:
         risk_level = "critique"
@@ -42,7 +29,11 @@ def predict(transaction: dict):
     else:
         risk_level = "faible"
 
-    factors = get_risk_factors(df.iloc[0]) if label == "fraude" else []
+    if label == "fraude":
+        fraud_sv = compute_shap(X.values)  # shape (1, n_features)
+        factors = shap_top_factors(fraud_sv[0])
+    else:
+        factors = []
 
     return {
         "fraud_probability": round(fraud_prob, 4),
