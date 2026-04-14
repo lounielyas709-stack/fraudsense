@@ -61,7 +61,12 @@ async def upload_csv(
     probs = model.predict_proba(X)[:, 1]
 
     # Compute SHAP for all rows at once (vectorised — same cost as predicting)
-    all_fraud_sv = compute_shap(X)  # shape (n_rows, n_features)
+    try:
+        all_fraud_sv = compute_shap(X)  # shape (n_rows, n_features)
+        use_shap = True
+    except Exception:
+        all_fraud_sv = None
+        use_shap = False
 
     db_params = parse_db_url(DATABASE_URL)
     try:
@@ -106,7 +111,7 @@ async def upload_csv(
                 risk_level = "faible"
 
             if label == "fraude":
-                factors = shap_top_factors(all_fraud_sv[i])
+                factors = shap_top_factors(all_fraud_sv[i]) if use_shap else ["Pattern inhabituel détecté"]
             else:
                 factors = []
 
