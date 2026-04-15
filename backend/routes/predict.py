@@ -30,8 +30,8 @@ def predict(transaction: dict, threshold: float = Query(0.5, ge=0.1, le=0.9)):
         risk_level = "faible"
 
     if label == "fraude":
-        fraud_sv = compute_shap(X.values)  # shape (1, n_features)
-        factors = shap_top_factors(fraud_sv[0])
+        fraud_sv = compute_shap(X.values)
+        factors = shap_top_factors(fraud_sv[0]) if fraud_sv is not None else ["Pattern inhabituel détecté"]
     else:
         factors = []
 

@@ -1,5 +1,7 @@
 import os
 import logging
+import threading
+import numpy as np
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.routes.predict import router as predict_router
@@ -26,6 +28,17 @@ try:
     logger.info("Base de données initialisée avec succès")
 except Exception as e:
     logger.error(f"Impossible d'initialiser la base de données : {e}")
+
+# Pré-chauffe SHAP en arrière-plan pour que la première simulation soit rapide
+def _warmup_shap():
+    try:
+        from backend.ml.loader import compute_shap
+        compute_shap(np.zeros((1, 29)))
+        logger.info("SHAP explainer prêt")
+    except Exception as e:
+        logger.warning(f"SHAP warmup échoué : {e}")
+
+threading.Thread(target=_warmup_shap, daemon=True).start()
 
 app.include_router(predict_router)
 app.include_router(upload_router)

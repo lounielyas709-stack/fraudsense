@@ -44,6 +44,7 @@ export default function SimulatePage() {
   const [tx, setTx] = useState(DEFAULT_TX);
   const [result, setResult] = useState<SimResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [simError, setSimError] = useState<string | null>(null);
   const [threshold, setThreshold] = useState(0.5);
 
   // Persist threshold in localStorage
@@ -59,9 +60,12 @@ export default function SimulatePage() {
 
   const handleSimulate = async () => {
     setLoading(true);
+    setSimError(null);
     try {
-      const res = await axios.post(`${API}/simulate?threshold=${threshold}`, tx, { timeout: 15000 });
+      const res = await axios.post(`${API}/simulate?threshold=${threshold}`, tx, { timeout: 60000 });
       setResult(res.data);
+    } catch {
+      setSimError('Erreur lors de la simulation — réessayez dans quelques secondes.');
     } finally {
       setLoading(false);
     }
@@ -202,7 +206,15 @@ export default function SimulatePage() {
 
         {/* Right — Result */}
         <div>
-          {!result ? (
+          {simError ? (
+            <div style={{
+              background: '#f8717111', border: '1px solid #f8717130',
+              borderRadius: 12, padding: 24, textAlign: 'center'
+            }}>
+              <div style={{ color: '#f87171', fontWeight: 600, marginBottom: 8 }}>Erreur</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{simError}</div>
+            </div>
+          ) : !result ? (
             <div style={{
               height: '100%', minHeight: 300,
               background: 'var(--bg-card)', border: '1px solid var(--border)',

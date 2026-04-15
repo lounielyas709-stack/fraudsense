@@ -22,11 +22,21 @@ def _get_explainer():
     return _explainer
 
 
-def compute_shap(X) -> np.ndarray:
-    """Return SHAP values for the fraud class, shape (n_rows, n_features)."""
-    sv = _get_explainer().shap_values(X, check_additivity=False)
-    # RandomForest returns [class_0, class_1]; XGBoost returns a single array
-    return sv[1] if isinstance(sv, list) else sv
+def compute_shap(X):
+    """
+    Return SHAP values for the fraud class, shape (n_rows, n_features).
+    Returns None if SHAP is unavailable or fails.
+    """
+    global _shap_available
+    if _shap_available is False:
+        return None
+    try:
+        sv = _get_explainer().shap_values(X, check_additivity=False)
+        _shap_available = True
+        return sv[1] if isinstance(sv, list) else sv
+    except Exception:
+        _shap_available = False
+        return None
 
 
 def shap_top_factors(fraud_sv_row: np.ndarray, n: int = 3) -> list[str]:
