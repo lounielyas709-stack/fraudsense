@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query
 from backend.db.models import DATABASE_URL
-from backend.ml.loader import model, scaler, compute_shap, shap_top_factors
+from backend.ml.loader import model, scaler
 import pandas as pd
 import io
 import psycopg2
@@ -9,6 +9,21 @@ from urllib.parse import urlparse, parse_qs
 router = APIRouter()
 
 REQUIRED_COLS = [f"V{i}" for i in range(1, 29)] + ["Amount"]
+TOP_FEATURES = ["V17", "V14", "V12", "V10", "V16", "V3", "V7", "V11"]
+
+
+def _risk_factors_bulk(row, v_cols: list) -> list[str]:
+    """Heuristique légère pour le bulk — SHAP réservé aux prédictions individuelles."""
+    factors = []
+    for feat in TOP_FEATURES:
+        col = feat.lower()
+        if col in v_cols:
+            val = row[col]
+            if abs(val) > 2:
+                factors.append(f"{feat} anormal ({val:.2f})")
+    if not factors:
+        factors.append("Pattern inhabituel détecté")
+    return factors[:3]
 
 
 def parse_db_url(url: str) -> dict:
@@ -60,14 +75,6 @@ async def upload_csv(
     X = df[v_cols + ["amount_scaled"]].values
     probs = model.predict_proba(X)[:, 1]
 
-    # Compute SHAP for all rows at once (vectorised — same cost as predicting)
-    try:
-        all_fraud_sv = compute_shap(X)  # shape (n_rows, n_features)
-        use_shap = True
-    except Exception:
-        all_fraud_sv = None
-        use_shap = False
-
     db_params = parse_db_url(DATABASE_URL)
     try:
         conn = psycopg2.connect(**db_params)
@@ -98,7 +105,7 @@ async def upload_csv(
 
         # Insert predictions via COPY
         pred_buf = io.StringIO()
-        for i, (tx_id, (_, row), prob) in enumerate(zip(tx_ids, df.iterrows(), probs)):
+        for tx_id, (_, row), prob in zip(tx_ids, df.iterrows(), probs):
             fraud_prob = float(prob)
             label = "fraude" if fraud_prob > threshold else "normal"
             if fraud_prob > 0.8:
@@ -111,7 +118,7 @@ async def upload_csv(
                 risk_level = "faible"
 
             if label == "fraude":
-                factors = shap_top_factors(all_fraud_sv[i]) if use_shap else ["Pattern inhabituel détecté"]
+                factors = _risk_factors_bulk(row, v_cols)
             else:
                 factors = []
 
