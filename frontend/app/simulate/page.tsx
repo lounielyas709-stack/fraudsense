@@ -265,10 +265,10 @@ export default function SimulatePage() {
               {result.risk_factors.length > 0 && (
                 <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 20 }}>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>
-                    Analyse SHAP
+                    Facteurs de risque
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>
-                    Contributions des features à la décision
+                    Features anormales détectées
                   </div>
                   {result.risk_factors.map((f, i) => (
                     <div key={i} style={{
