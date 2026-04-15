@@ -139,21 +139,27 @@ export default function SimulatePage() {
             <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 16 }}>
               Features clés
             </div>
-            {["V17", "V14", "V12", "V10"].map(feat => (
-              <div key={feat} style={{ marginBottom: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'monospace' }}>{feat}</span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: Math.abs((tx as any)[feat]) > 2 ? '#f87171' : 'var(--text-primary)' }}>
-                    {(tx as any)[feat].toFixed(2)}
-                  </span>
+            {["V17", "V14", "V12", "V10"].map(feat => {
+              // Ces 4 features : négatif extrême = fraude, positif extrême = anti-fraude
+              const val = (tx as any)[feat];
+              const sliderColor = val < -2 ? '#f87171' : val > 2 ? '#4ade80' : 'var(--cyan)';
+              const labelColor  = val < -2 ? '#f87171' : val > 2 ? '#4ade80' : 'var(--text-primary)';
+              return (
+                <div key={feat} style={{ marginBottom: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'monospace' }}>{feat}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: labelColor }}>
+                      {val.toFixed(2)}
+                    </span>
+                  </div>
+                  <input type="range" min="-15" max="15" step="0.1"
+                    value={val}
+                    onChange={e => updateField(feat, e.target.value)}
+                    style={{ width: '100%', accentColor: sliderColor }}
+                  />
                 </div>
-                <input type="range" min="-15" max="15" step="0.1"
-                  value={(tx as any)[feat]}
-                  onChange={e => updateField(feat, e.target.value)}
-                  style={{ width: '100%', accentColor: Math.abs((tx as any)[feat]) > 2 ? '#f87171' : 'var(--cyan)' }}
-                />
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Threshold slider */}
